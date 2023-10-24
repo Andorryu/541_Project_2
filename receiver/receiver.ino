@@ -1,24 +1,26 @@
 #include <arduino-timer.h>
 
+#define MAX_MESSAGE_SIZE 1000
+
 // timeout timer
-auto timeoutTimer = timer_create_default();
-int timeoutms = 5000;
-Timer<>::Task timeoutHandle;
+Timer<1, micros> timeoutTimer;
+unsigned long timeoutus = 500000;
+Timer<1, micros>::Task timeoutHandle;
 
 // read bit timer
-auto readTimer = timer_create_default();
-int readTimeus = 0; // set when bitrate is calculated
-Timer<1, micros>::Task readTimeHandle;
+Timer<2, micros> readTimer;
+unsigned long readTimeus = 0; // set when bitrate is calculated
+Timer<2, micros>::Task readTimeHandle;
 
 int byteCount = 0;
-int** message;
+byte* message = (byte*) calloc(MAX_MESSAGE_SIZE, 1);
 int bitCount = 0;
 int flagState = 0;
 int bit = 0;
 int lastBit = 0;
 int val = 0;
-int flagTimes[3]; // store time measurements here
-int bitrate;
+unsigned long flagTimes[3]; // store time measurements here
+float bitrate;
 
 void setup() {
   // put your setup code here, to run once:
@@ -28,22 +30,36 @@ void setup() {
 void loop() {
 
   auto timeLeft = timeoutTimer.tick();
+  readTimer.tick();
   lastBit = bit; // get bit from last iter
   val = analogRead(A1);
   bit = round((float)val/900); // get new bit
+
+  // GET START FLAG
   if (bit != lastBit && flagState < 4) { // if bit has flipped since last sample, and message hasn't started
     flagState++;
+    Serial.print("FlagState: ");
+    Serial.println(flagState);
     if (flagState > 1) {
-      flagTimes[flagState-2] = timeoutms - timeLeft;// save time between flagstate changes
+      Serial.print("Time Left: ");
+      Serial.println(timeLeft);
+      flagTimes[flagState-2] = timeoutus - timeLeft;// save time between flagstate changes
       timeoutTimer.cancel(timeoutHandle); // cancel timeout if flagstate changes, but not when first bit flips
     }
-    timeoutHandle = timeoutTimer.in(timeoutms, TimeoutHandler); // reset timeout timer when flagState changes
+    timeoutHandle = timeoutTimer.in(timeoutus, TimeoutHandler); // reset timeout timer when flagState changes
   }
+
   if (flagState == 4) { // finished receiving start flag - 1 0 1 0
-  
+
+
+    Serial.println("Flag state is 4");
+
+
+
     timeoutTimer.cancel(timeoutHandle); // cancel timeout when flag is done sending
     // calculate bitrate
-    bitrate = avg(flagTimes, 3);
+    readTimeus = avg(flagTimes, 3);
+    bitrate = 1/(usToS(readTimeus));
     
     Serial.print("Times: ");
     for (int i = 0; i < (sizeof(flagTimes)/sizeof(flagTimes[0])); i++) {
@@ -51,43 +67,67 @@ void loop() {
       Serial.print(" ");
     }
     Serial.println();
+    Serial.print("read time: ");
+    Serial.println(readTimeus);
     Serial.print("Bitrate: ");
     Serial.println(bitrate);
 
-    readTimeHandle = readTimer.every(readTimeus, PeriodicReadHandler); // start reading
+    readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     flagState = 5;
   }
-
-  //Serial.println("times: ");
-  //for (int i = 0; i < (sizeof(flagTimes)/sizeof(flagTimes[0])); i++) {
-  //  Serial.println(flagTimes[i]);
-  //}
-  //Serial.println();
-
 }
 
 bool PeriodicReadHandler(void *) {
+
+  Serial.println("READING BIT"); // 01100001 01101110 01100100 01110010 01100101 01110111 == andrew
+  // read message
+  message[byteCount] <<= 1;
+  message[byteCount] |= bit;
+
   // increment counters
   bitCount++;
   if (bitCount == 8) {
+    Serial.print("Byte read value: ");
+    Serial.println(message[byteCount]);
+    Serial.print("char read: ");
+    Serial.println((char)message[byteCount]);
     bitCount = 0;
     byteCount++;
+    if (message[byteCount-1] == 0) {
+      int messageSize = byteCount;
+      flagState = 0;
+      byteCount = 0;
+      Serial.println("Message:");
+      printMessage(message, messageSize);
+      return false;
+    }
   }
-
-  // 
   
+  readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler);
   return false;
 }
 
 bool TimeoutHandler(void *) {
   flagState = 0;
+  Serial.println("TIMEOUT");
   return false;
 }
 
-int avg(int list[], int size) {
-  int sum = 0;
+unsigned long avg(unsigned long list[], int size) {
+  unsigned long sum = 0;
   for (int i = 0; i < size; i++) {
     sum += list[i];
   }
-  return sum/size;
+  return (unsigned long)(sum/size);
+}
+
+void printMessage(byte* message, int messageSize) {
+  for (int i = 0; i < messageSize; i++) {
+    Serial.print((char) message[i]);
+  }
+  Serial.println("\n");
+}
+
+float usToS(unsigned long us) {
+  return ((float)us)/1000000;
 }
