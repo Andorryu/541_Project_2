@@ -1,6 +1,7 @@
 #include <arduino-timer.h>
 
 #define MAX_MESSAGE_SIZE 1000
+#define FLAG_LENGTH 8
 
 // timeout timer
 Timer<1, micros> timeoutTimer;
@@ -19,7 +20,7 @@ int flagState = 0;
 int bit = 0;
 int lastBit = 0;
 int val = 0;
-unsigned long flagTimes[3]; // store time measurements here
+unsigned long flagTimes[FLAG_LENGTH-1]; // store time measurements here
 float bitrate;
 
 void setup() {
@@ -36,7 +37,7 @@ void loop() {
   bit = round((float)val/900); // get new bit
 
   // GET START FLAG
-  if (bit != lastBit && flagState < 4) { // if bit has flipped since last sample, and message hasn't started
+  if (bit != lastBit && flagState < FLAG_LENGTH) { // if bit has flipped since last sample, and message hasn't started
     flagState++;
     Serial.print("FlagState: ");
     Serial.println(flagState);
@@ -49,7 +50,7 @@ void loop() {
     timeoutHandle = timeoutTimer.in(timeoutus, TimeoutHandler); // reset timeout timer when flagState changes
   }
 
-  if (flagState == 4) { // finished receiving start flag - 1 0 1 0
+  if (flagState == FLAG_LENGTH) { // finished receiving start flag - 1 0 1 0
 
 
     Serial.println("Flag state is 4");
@@ -73,7 +74,7 @@ void loop() {
     Serial.println(bitrate);
 
     readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
-    flagState = 5;
+    flagState = FLAG_LENGTH+1;
   }
 }
 
