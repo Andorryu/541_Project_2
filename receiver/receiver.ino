@@ -1,7 +1,7 @@
 #include <arduino-timer.h>
 
 #define MAX_MESSAGE_SIZE 1000
-#define FLAG_LENGTH 8
+#define FLAG_LENGTH 4
 
 // timeout timer
 Timer<1, micros> timeoutTimer;
@@ -59,11 +59,11 @@ void loop() {
 
     timeoutTimer.cancel(timeoutHandle); // cancel timeout when flag is done sending
     // calculate bitrate
-    readTimeus = avg(flagTimes, 3);
+    readTimeus = avg(flagTimes, FLAG_LENGTH-1);
     bitrate = 1/(usToS(readTimeus));
     
     Serial.print("Times: ");
-    for (int i = 0; i < (sizeof(flagTimes)/sizeof(flagTimes[0])); i++) {
+    for (int i = 0; i < FLAG_LENGTH-1; i++) {
       Serial.print(flagTimes[i]);
       Serial.print(" ");
     }
@@ -80,7 +80,8 @@ void loop() {
 
 bool PeriodicReadHandler(void *) {
 
-  Serial.println("READING BIT"); // 01100001 01101110 01100100 01110010 01100101 01110111 == andrew
+  Serial.print("READING BIT "); // 01100001 01101110 01100100 01110010 01100101 01110111 == andrew 01110010 01100001 01101110
+  Serial.println(bit);
   // read message
   message[byteCount] <<= 1;
   message[byteCount] |= bit;
