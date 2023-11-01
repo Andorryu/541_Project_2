@@ -1,11 +1,11 @@
 #include <arduino-timer.h>
 
-#define MAX_MESSAGE_SIZE 1000
-#define FLAG_LENGTH 4
+#define MAX_MESSAGE_SIZE 2
+#define FLAG_LENGTH 10
 
 // timeout timer
 Timer<1, micros> timeoutTimer;
-unsigned long timeoutus = 500000;
+unsigned long timeoutus = 1000000;
 Timer<1, micros>::Task timeoutHandle;
 
 // read bit timer
@@ -13,6 +13,7 @@ Timer<2, micros> readTimer;
 unsigned long readTimeus = 0; // set when bitrate is calculated
 Timer<2, micros>::Task readTimeHandle;
 
+bool throw_bit = true;
 int byteCount = 0;
 byte* message = (byte*) calloc(MAX_MESSAGE_SIZE, 1);
 int bitCount = 0;
@@ -34,16 +35,16 @@ void loop() {
   readTimer.tick();
   lastBit = bit; // get bit from last iter
   val = analogRead(A1);
-  bit = round((float)val/900); // get new bit
+  bit = round((float)val/400); // get new bit
 
   // GET START FLAG
   if (bit != lastBit && flagState < FLAG_LENGTH) { // if bit has flipped since last sample, and message hasn't started
     flagState++;
-    Serial.print("FlagState: ");
-    Serial.println(flagState);
+    //Serial.print("FlagState: ");
+    //Serial.println(flagState);
     if (flagState > 1) {
-      Serial.print("Time Left: ");
-      Serial.println(timeLeft);
+      //Serial.print("Time Left: ");
+      //Serial.println(timeLeft);
       flagTimes[flagState-2] = timeoutus - timeLeft;// save time between flagstate changes
       timeoutTimer.cancel(timeoutHandle); // cancel timeout if flagstate changes, but not when first bit flips
     }
@@ -53,54 +54,61 @@ void loop() {
   if (flagState == FLAG_LENGTH) { // finished receiving start flag - 1 0 1 0
 
 
-    Serial.println("Flag state is 4");
-
-
+    //Serial.print("Flag state is ");
+    //Serial.println(FLAG_LENGTH);
 
     timeoutTimer.cancel(timeoutHandle); // cancel timeout when flag is done sending
+    readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
+    
     // calculate bitrate
     readTimeus = avg(flagTimes, FLAG_LENGTH-1);
     bitrate = 1/(usToS(readTimeus));
     
-    Serial.print("Times: ");
-    for (int i = 0; i < FLAG_LENGTH-1; i++) {
-      Serial.print(flagTimes[i]);
-      Serial.print(" ");
-    }
-    Serial.println();
-    Serial.print("read time: ");
-    Serial.println(readTimeus);
-    Serial.print("Bitrate: ");
-    Serial.println(bitrate);
+    delay(10);
 
-    readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
+    //Serial.print("Times: ");
+    for (int i = 0; i < FLAG_LENGTH-1; i++) {
+      //Serial.print(flagTimes[i]);
+      //Serial.print(" ");
+    }
+    //Serial.println();
+    //Serial.print("read time: ");
+    //Serial.println(readTimeus);
+    //Serial.print("Bitrate: ");
+    //Serial.println(bitrate);
+
     flagState = FLAG_LENGTH+1;
   }
 }
 
 bool PeriodicReadHandler(void *) {
 
-  Serial.print("READING BIT "); // 01100001 01101110 01100100 01110010 01100101 01110111 == andrew 01110010 01100001 01101110
-  Serial.println(bit);
   // read message
+  if (throw_bit) {
+    delay(2);
+    throw_bit = false;
+  }
   message[byteCount] <<= 1;
   message[byteCount] |= bit;
 
   // increment counters
   bitCount++;
   if (bitCount == 8) {
-    Serial.print("Byte read value: ");
-    Serial.println(message[byteCount]);
-    Serial.print("char read: ");
-    Serial.println((char)message[byteCount]);
     bitCount = 0;
     byteCount++;
     if (message[byteCount-1] == 0) {
       int messageSize = byteCount;
       flagState = 0;
       byteCount = 0;
+      Serial.print("Bitrate: ");
+      Serial.println(bitrate);
       Serial.println("Message:");
       printMessage(message, messageSize);
+      for (int i = 0; i < messageSize; i++) {
+        Serial.print(byteToBinary(message[i]));
+        Serial.print(" ");
+      }
+      Serial.println("");
       return false;
     }
   }
@@ -132,4 +140,15 @@ void printMessage(byte* message, int messageSize) {
 
 float usToS(unsigned long us) {
   return ((float)us)/1000000;
+}
+
+String byteToBinary(byte num) 
+{
+  String binaryString = "";
+  for (int i = 7; i >= 0; i--) 
+  {
+    int bit = (num >> i) & 1;
+    binaryString += String(bit);
+  }
+  return binaryString;
 }
