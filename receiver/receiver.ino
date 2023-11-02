@@ -1,7 +1,7 @@
 #include <arduino-timer.h>
 
-#define MAX_MESSAGE_SIZE 2
-#define FLAG_LENGTH 10
+#define MAX_MESSAGE_SIZE 100
+#define FLAG_LENGTH 4
 
 // timeout timer
 Timer<1, micros> timeoutTimer;
@@ -10,23 +10,24 @@ Timer<1, micros>::Task timeoutHandle;
 
 // read bit timer
 Timer<2, micros> readTimer;
-unsigned long readTimeus = 0; // set when bitrate is calculated
+unsigned short readTimeus = 0; // set when bitrate is calculated
+unsigned short flagTimes[FLAG_LENGTH-1]; // store time measurements here
 Timer<2, micros>::Task readTimeHandle;
 
 bool throw_bit = true;
 int byteCount = 0;
-byte* message = (byte*) calloc(MAX_MESSAGE_SIZE, 1);
+byte* message = NULL;
 int bitCount = 0;
 int flagState = 0;
 int bit = 0;
 int lastBit = 0;
 int val = 0;
-unsigned long flagTimes[FLAG_LENGTH-1]; // store time measurements here
 float bitrate;
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
+  Serial.println("Setup Complete");
 }
 
 void loop() {
@@ -40,8 +41,8 @@ void loop() {
   // GET START FLAG
   if (bit != lastBit && flagState < FLAG_LENGTH) { // if bit has flipped since last sample, and message hasn't started
     flagState++;
-    //Serial.print("FlagState: ");
-    //Serial.println(flagState);
+    // Serial.print("FlagState: ");
+    // Serial.println(flagState);
     if (flagState > 1) {
       //Serial.print("Time Left: ");
       //Serial.println(timeLeft);
@@ -58,13 +59,15 @@ void loop() {
     //Serial.println(FLAG_LENGTH);
 
     timeoutTimer.cancel(timeoutHandle); // cancel timeout when flag is done sending
-    readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     
     // calculate bitrate
-    readTimeus = avg(flagTimes, FLAG_LENGTH-1);
-    bitrate = 1/(usToS(readTimeus));
+    //readTimeus = avg(flagTimes, FLAG_LENGTH-1);
+    //readTimeus = flagTimes[FLAG_LENGTH-2];
+    readTimeus = 5000;
+    // Serial.println(readTimeus);
+    readTimeHandle = readTimer.in((unsigned long) readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     
-    delay(10);
+    //delay(10);
 
     //Serial.print("Times: ");
     for (int i = 0; i < FLAG_LENGTH-1; i++) {
@@ -87,6 +90,7 @@ bool PeriodicReadHandler(void *) {
   if (throw_bit) {
     delay(2);
     throw_bit = false;
+    message = (byte*) calloc(MAX_MESSAGE_SIZE, sizeof(char));
   }
   message[byteCount] <<= 1;
   message[byteCount] |= bit;
@@ -100,15 +104,21 @@ bool PeriodicReadHandler(void *) {
       int messageSize = byteCount;
       flagState = 0;
       byteCount = 0;
+      bitrate = 1/(usToS(readTimeus));
+      // for (int i = 0; i < FLAG_LENGTH-1) {
+
+      // }
       Serial.print("Bitrate: ");
       Serial.println(bitrate);
       Serial.println("Message:");
       printMessage(message, messageSize);
-      for (int i = 0; i < messageSize; i++) {
-        Serial.print(byteToBinary(message[i]));
-        Serial.print(" ");
-      }
-      Serial.println("");
+      // for (int i = 0; i < messageSize; i++) {
+      //   Serial.print(byteToBinary(message[i]));
+      //   Serial.print(" ");
+      // }
+      //Serial.println("");
+      
+      throw_bit = true;
       return false;
     }
   }
@@ -123,19 +133,21 @@ bool TimeoutHandler(void *) {
   return false;
 }
 
-unsigned long avg(unsigned long list[], int size) {
-  unsigned long sum = 0;
+unsigned short avg(unsigned short list[], int size) {
+  unsigned short sum = 0;
   for (int i = 0; i < size; i++) {
     sum += list[i];
   }
-  return (unsigned long)(sum/size);
+  return (unsigned short)(sum/size);
 }
 
 void printMessage(byte* message, int messageSize) {
   for (int i = 0; i < messageSize; i++) {
     Serial.print((char) message[i]);
+    Serial.print(" - ");
+    Serial.println(byteToBinary(message[i]));
   }
-  Serial.println("\n");
+  free(message);
 }
 
 float usToS(unsigned long us) {
