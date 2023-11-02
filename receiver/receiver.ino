@@ -36,7 +36,7 @@ void loop() {
   readTimer.tick();
   lastBit = bit; // get bit from last iter
   val = analogRead(A1);
-  bit = round((float)val/400); // get new bit
+  bit = round((float)val/550); // get new bit
 
   // GET START FLAG
   if (bit != lastBit && flagState < FLAG_LENGTH) { // if bit has flipped since last sample, and message hasn't started
@@ -62,8 +62,8 @@ void loop() {
     
     // calculate bitrate
     //readTimeus = avg(flagTimes, FLAG_LENGTH-1);
-    //readTimeus = flagTimes[FLAG_LENGTH-2];
-    readTimeus = 5000;
+    // readTimeus = flagTimes[FLAG_LENGTH-4];
+    readTimeus = 500;
     // Serial.println(readTimeus);
     readTimeHandle = readTimer.in((unsigned long) readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     
@@ -88,7 +88,7 @@ bool PeriodicReadHandler(void *) {
 
   // read message
   if (throw_bit) {
-    delay(2);
+    delayMicroseconds(200);
     throw_bit = false;
     message = (byte*) calloc(MAX_MESSAGE_SIZE, sizeof(char));
   }
