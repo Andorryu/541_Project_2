@@ -2,6 +2,7 @@
 
 #define MAX_MESSAGE_SIZE 100
 #define FLAG_LENGTH 4
+#define EXPECTED_MESSAGE "hello\n"
 
 // timeout timer
 Timer<1, micros> timeoutTimer;
@@ -59,21 +60,25 @@ void loop() {
     //Serial.println(FLAG_LENGTH);
 
     timeoutTimer.cancel(timeoutHandle); // cancel timeout when flag is done sending
-    
+    delayMicroseconds(500);
+    readTimeHandle = readTimer.in((unsigned long) readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     // calculate bitrate
     //readTimeus = avg(flagTimes, FLAG_LENGTH-1);
+    
+    // long avgTime = readTimer.tick();
+    // Serial.print("Time to take average: ");
+    // Serial.println(avgTime);
     // readTimeus = flagTimes[FLAG_LENGTH-4];
-    readTimeus = 500;
-    // Serial.println(readTimeus);
-    readTimeHandle = readTimer.in((unsigned long) readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
+    readTimeus = 5000;
+    //Serial.println(readTimeus);
     
     //delay(10);
 
     //Serial.print("Times: ");
-    for (int i = 0; i < FLAG_LENGTH-1; i++) {
+    //for (int i = 0; i < FLAG_LENGTH-1; i++) {
       //Serial.print(flagTimes[i]);
       //Serial.print(" ");
-    }
+    //}
     //Serial.println();
     //Serial.print("read time: ");
     //Serial.println(readTimeus);
@@ -86,9 +91,9 @@ void loop() {
 
 bool PeriodicReadHandler(void *) {
 
+  readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler);
   // read message
   if (throw_bit) {
-    delayMicroseconds(200);
     throw_bit = false;
     message = (byte*) calloc(MAX_MESSAGE_SIZE, sizeof(char));
   }
@@ -116,14 +121,13 @@ bool PeriodicReadHandler(void *) {
       //   Serial.print(byteToBinary(message[i]));
       //   Serial.print(" ");
       // }
-      //Serial.println("");
-      
+      // Serial.println("");
+      readTimer.cancel(readTimeHandle);
       throw_bit = true;
       return false;
     }
   }
   
-  readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler);
   return false;
 }
 
@@ -142,11 +146,25 @@ unsigned short avg(unsigned short list[], int size) {
 }
 
 void printMessage(byte* message, int messageSize) {
+  int num_error = 0;
   for (int i = 0; i < messageSize; i++) {
+    String binary_string = byteToBinary(message[i]);
+    String expected = byteToBinary(EXPECTED_MESSAGE[i]);
     Serial.print((char) message[i]);
     Serial.print(" - ");
-    Serial.println(byteToBinary(message[i]));
+    Serial.println(binary_string);
+    Serial.print((char) EXPECTED_MESSAGE[i]);
+    Serial.print(" - ");
+    Serial.println(expected);
+    num_error += comp_byte(binary_string, expected);
   }
+  float ber = num_error/((float)8*(float)(messageSize-1));
+  Serial.print("Expected: ");
+  Serial.println(EXPECTED_MESSAGE);
+  Serial.print("Received: ");
+  Serial.println((char*)message);
+  Serial.print("Bit Error Rate is ");
+  Serial.println(ber);
   free(message);
 }
 
@@ -163,4 +181,14 @@ String byteToBinary(byte num)
     binaryString += String(bit);
   }
   return binaryString;
+}
+
+int comp_byte(String str1, String str2) {
+  int total = 0;
+  for (int i = 0; i < 8; i++) {
+    if (str1[i] != str2[i]) {
+      total++;
+    }
+  }
+  return total;
 }
