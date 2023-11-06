@@ -1,5 +1,7 @@
-#define DELAY_VALUE 500
-#define LOOP 10
+//revised Tranmitter Code
+
+#define DELAY_VALUE 5
+#define LOOP 4
 
 int IR_LED_PIN = A0;
 int led_blink_count = 0;
@@ -15,39 +17,70 @@ void loop()
 {  
   if(Serial.available() > 0)
   {
-    //start_flag(LOOP);
+    //start_flag(LOOP); get rid of this
     String message = Serial.readString();
     int message_length = message.length();;
 
-    start_flag(LOOP);
+    Serial.println("String message: ");
+    Serial.println(message);
 
+    //prints and calculates the expected binary
     for(int i = 0; i < message_length; i++)
     {
       char character = message.charAt(i);
       byte ascii_value = int(character);
       String binary_value = byteToBinary(ascii_value);
 
-      // Serial.println("Character: ");
-      // Serial.println(character);
-      // Serial.println("ASCII Value: \n");
-      // Serial.println(ascii_value);
-      // Serial.println("ASCII Value (Binary): \n");
-      // Serial.println(binary_value);
-
       for(int bit = 0; bit < 8; bit++)
       {
         char current_bit = binary_value[bit]; 
-        check_blink(current_bit);
-        delay(5);
-        //delayMicroseconds(DELAY_VALUE);
-      }
+        Serial.print(current_bit);
+        delay(DELAY_VALUE);
 
-      if(i == message_length - 1)
-      { 
-        Serial.println("Total number of times LED blinked: \n");
-        Serial.print(led_blink_count);
+        if(bit == 7)
+        {
+          Serial.print(" ");
+        }
       }
     }
+
+    //start_flag(LOOP); instead of start loop being separete function, appedning to start value
+    //blinking the actual message
+    String final_message = "1010";
+
+    for(int i = 0; i < message_length; i++)
+    {
+      char character = message.charAt(i);
+      byte ascii_value = int(character);
+      String binary_value = byteToBinary(ascii_value);
+      final_message = final_message + binary_value;
+    }
+
+    //this final message is not 1010 + message in bits + end flag (00000000)
+    final_message = final_message + "00000000";
+    Serial.println(" ");
+    Serial.println(final_message);
+
+    for(int i = 0; i< final_message.length(); i++)
+    {
+        check_blink(final_message[i]);
+        delay(DELAY_VALUE);
+        //delayMicroseconds(DELAY_VALUE);
+      
+      
+      
+      // if(i == final_message.length() - 1)
+      // { 
+      //   Serial.println("\nTotal number of times LED blinked:");
+      //   Serial.println(led_blink_count);
+      // }
+    }
+    
+      
+        Serial.println("\nTotal number of times LED blinked:");
+        Serial.println(led_blink_count);
+      
+    digitalWrite(IR_LED_PIN, LOW);
   }
 }
 
@@ -56,10 +89,10 @@ void start_flag(int loop)
   for(int i = 0; i < loop/2; i++)
   {
     digitalWrite(IR_LED_PIN, HIGH);
-    delay(5);
+    delay(DELAY_VALUE);
     //delayMicroseconds(DELAY_VALUE);
     digitalWrite(IR_LED_PIN, LOW);
-    delay(5);
+    delay(DELAY_VALUE);
     //delayMicroseconds(DELAY_VALUE);
   }
 }
