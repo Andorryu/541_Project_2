@@ -1,8 +1,8 @@
 #include <arduino-timer.h>
 
 #define MAX_MESSAGE_SIZE 100
-#define FLAG_LENGTH 4
-#define EXPECTED_MESSAGE "hello\n"
+#define FLAG_LENGTH 10
+#define EXPECTED_MESSAGE "hello world\n"
 
 // timeout timer
 Timer<1, micros> timeoutTimer;
@@ -60,7 +60,7 @@ void loop() {
     //Serial.println(FLAG_LENGTH);
 
     timeoutTimer.cancel(timeoutHandle); // cancel timeout when flag is done sending
-    delayMicroseconds(500);
+    delayMicroseconds(50);
     readTimeHandle = readTimer.in((unsigned long) readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     // calculate bitrate
     //readTimeus = avg(flagTimes, FLAG_LENGTH-1);
@@ -69,7 +69,8 @@ void loop() {
     // Serial.print("Time to take average: ");
     // Serial.println(avgTime);
     // readTimeus = flagTimes[FLAG_LENGTH-4];
-    readTimeus = 5000;
+    readTimeus = 500;
+    message = (byte*) calloc(MAX_MESSAGE_SIZE, sizeof(char));
     //Serial.println(readTimeus);
     
     //delay(10);
@@ -93,10 +94,6 @@ bool PeriodicReadHandler(void *) {
 
   readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler);
   // read message
-  if (throw_bit) {
-    throw_bit = false;
-    message = (byte*) calloc(MAX_MESSAGE_SIZE, sizeof(char));
-  }
   message[byteCount] <<= 1;
   message[byteCount] |= bit;
 
@@ -113,6 +110,11 @@ bool PeriodicReadHandler(void *) {
       // for (int i = 0; i < FLAG_LENGTH-1) {
 
       // }
+      for (int i = 0; i < FLAG_LENGTH-1; i++) {
+        Serial.print(flagTimes[i]);
+        Serial.print(" ");
+      }
+      Serial.println();
       Serial.print("Bitrate: ");
       Serial.println(bitrate);
       Serial.println("Message:");
@@ -123,7 +125,6 @@ bool PeriodicReadHandler(void *) {
       // }
       // Serial.println("");
       readTimer.cancel(readTimeHandle);
-      throw_bit = true;
       return false;
     }
   }
