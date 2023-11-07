@@ -1,7 +1,7 @@
 //revised Tranmitter Code
 
-#define DELAY_VALUE 5
-#define LOOP 4
+#define DELAY_VALUE 500
+#define LOOP 10
 
 int IR_LED_PIN = A0;
 int led_blink_count = 0;
@@ -11,6 +11,7 @@ void setup()
   pinMode(IR_LED_PIN, OUTPUT);
   Serial.begin(9600);
   Serial.println("Setup Complete");
+  digitalWrite(IR_LED_PIN, LOW);
 }
 
 void loop()
@@ -35,7 +36,7 @@ void loop()
       {
         char current_bit = binary_value[bit]; 
         Serial.print(current_bit);
-        delay(DELAY_VALUE);
+        delayMicroseconds(DELAY_VALUE);
 
         if(bit == 7)
         {
@@ -45,8 +46,13 @@ void loop()
     }
 
     //start_flag(LOOP); instead of start loop being separete function, appedning to start value
-    //blinking the actual message
-    String final_message = "1010";
+
+    String final_message = "";
+
+    for(int i = 0; i < LOOP/2; i++)
+    {
+    final_message = final_message + "10";
+    }
 
     for(int i = 0; i < message_length; i++)
     {
@@ -56,16 +62,17 @@ void loop()
       final_message = final_message + binary_value;
     }
 
-    //this final message is not 1010 + message in bits + end flag (00000000)
+    //this final message is now 1010 + message in bits + end flag (00000000)
     final_message = final_message + "00000000";
     Serial.println(" ");
     Serial.println(final_message);
 
+    //blinking the actual message
     for(int i = 0; i< final_message.length(); i++)
     {
         check_blink(final_message[i]);
-        delay(DELAY_VALUE);
-        //delayMicroseconds(DELAY_VALUE);
+        //delay(DELAY_VALUE);
+        delayMicroseconds(DELAY_VALUE);
       
       
       
@@ -79,8 +86,13 @@ void loop()
       
         Serial.println("\nTotal number of times LED blinked:");
         Serial.println(led_blink_count);
-      
+    
+    //stagnant is off
     digitalWrite(IR_LED_PIN, LOW);
+    //to test if IR LED is not burnt, run code below and comment code out above
+    //stagnant is on
+    //digitalWrite(IR_LED_PIN, 1);
+
   }
 }
 
