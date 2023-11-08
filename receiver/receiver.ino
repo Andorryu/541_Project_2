@@ -2,7 +2,7 @@
 
 #define MAX_MESSAGE_SIZE 100
 #define FLAG_LENGTH 10
-#define EXPECTED_MESSAGE "hello world\n"
+#define EXPECTED_MESSAGE "hello\n"
 
 // timeout timer
 Timer<1, micros> timeoutTimer;
@@ -37,7 +37,7 @@ void loop() {
   readTimer.tick();
   lastBit = bit; // get bit from last iter
   val = analogRead(A1);
-  bit = round((float)val/550); // get new bit
+  bit = val > 100 ? 1 : 0; // get new bit
 
   // GET START FLAG
   if (bit != lastBit && flagState < FLAG_LENGTH) { // if bit has flipped since last sample, and message hasn't started
@@ -61,15 +61,15 @@ void loop() {
 
     timeoutTimer.cancel(timeoutHandle); // cancel timeout when flag is done sending
     delayMicroseconds(50);
-    readTimeHandle = readTimer.in((unsigned long) readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     // calculate bitrate
-    //readTimeus = avg(flagTimes, FLAG_LENGTH-1);
+    // readTimeus = avg(flagTimes, FLAG_LENGTH-1);
+    readTimeus = 2000;
+    readTimeHandle = readTimer.in((unsigned long) readTimeus, PeriodicReadHandler); // start reading message at calculated bitrate
     
     // long avgTime = readTimer.tick();
     // Serial.print("Time to take average: ");
     // Serial.println(avgTime);
     // readTimeus = flagTimes[FLAG_LENGTH-4];
-    readTimeus = 500;
     message = (byte*) calloc(MAX_MESSAGE_SIZE, sizeof(char));
     //Serial.println(readTimeus);
     
@@ -94,7 +94,10 @@ bool PeriodicReadHandler(void *) {
 
   readTimeHandle = readTimer.in(readTimeus, PeriodicReadHandler);
   // read message
-  message[byteCount] <<= 1;
+    message[byteCount] <<= 1;
+  // if (bitCount == 8) {
+  //   message[byteCount] <<= 1;
+  // }
   message[byteCount] |= bit;
 
   // increment counters
