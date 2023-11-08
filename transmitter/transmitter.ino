@@ -1,10 +1,20 @@
 //revised Tranmitter Code
 
-#define DELAY_VALUE 500
+#include <arduino-timer.h>
+
+#define DELAY_VALUE 5000
 #define LOOP 10
 
-int IR_LED_PIN = A0;
+int bitrate = 2000;
+
+String final_message = "";
+
+int IR_LED_PIN = A2;
 int led_blink_count = 0;
+int j;
+
+Timer<2,micros> timer;
+Timer<2, micros>::Task handle;
 
 void setup()
 {
@@ -16,6 +26,8 @@ void setup()
 
 void loop()
 {  
+  timer.tick();
+
   if(Serial.available() > 0)
   {
     //start_flag(LOOP); get rid of this
@@ -36,7 +48,7 @@ void loop()
       {
         char current_bit = binary_value[bit]; 
         Serial.print(current_bit);
-        delayMicroseconds(DELAY_VALUE);
+        delayMicroseconds(5000);
 
         if(bit == 7)
         {
@@ -47,11 +59,9 @@ void loop()
 
     //start_flag(LOOP); instead of start loop being separete function, appedning to start value
 
-    String final_message = "";
-
     for(int i = 0; i < LOOP/2; i++)
     {
-    final_message = final_message + "10";
+      final_message = final_message + "10";
     }
 
     for(int i = 0; i < message_length; i++)
@@ -67,13 +77,11 @@ void loop()
     Serial.println(" ");
     Serial.println(final_message);
 
+
+    handle = timer.in(DELAY_VALUE, handler);
+    j = 0; 
     //blinking the actual message
-    for(int i = 0; i< final_message.length(); i++)
-    {
-        check_blink(final_message[i]);
-        //delay(DELAY_VALUE);
-        delayMicroseconds(DELAY_VALUE);
-      
+        
       
       
       // if(i == final_message.length() - 1)
@@ -81,14 +89,8 @@ void loop()
       //   Serial.println("\nTotal number of times LED blinked:");
       //   Serial.println(led_blink_count);
       // }
-    }
     
-      
-        Serial.println("\nTotal number of times LED blinked:");
-        Serial.println(led_blink_count);
-    
-    //stagnant is off
-    digitalWrite(IR_LED_PIN, LOW);
+  
     //to test if IR LED is not burnt, run code below and comment code out above
     //stagnant is on
     //digitalWrite(IR_LED_PIN, 1);
@@ -96,6 +98,7 @@ void loop()
   }
 }
 
+/*
 void start_flag(int loop)
 {
   for(int i = 0; i < loop/2; i++)
@@ -107,6 +110,24 @@ void start_flag(int loop)
     delay(DELAY_VALUE);
     //delayMicroseconds(DELAY_VALUE);
   }
+}
+*/
+
+bool handler(void*)
+{
+  handle = timer.in(DELAY_VALUE, handler);
+  check_blink(final_message[j++]);
+  
+  if(j == final_message.length())
+  {
+    Serial.println("\nTotal number of times LED blinked:");
+    Serial.println(led_blink_count);
+    led_blink_count = 0; 
+    digitalWrite(IR_LED_PIN, LOW);
+    final_message = "";
+    timer.cancel(handle);
+  }
+  return false;  
 }
 
 void check_blink(char c)
